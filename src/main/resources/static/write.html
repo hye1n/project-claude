@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>글쓰기 - 자유 게시판</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f2f5; }
+    .board-wrap { max-width: 980px; margin: 40px auto; padding: 0 16px; }
+    #contentArea { min-height: 320px; resize: vertical; }
+    .char-count { font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+
+<!-- 네비게이션 -->
+<nav class="navbar navbar-dark bg-dark shadow-sm">
+  <div class="container" style="max-width:980px">
+    <a class="navbar-brand fw-bold fs-5" href="/index.html">
+      <i class="bi bi-journal-text me-2"></i>자유 게시판
+    </a>
+  </div>
+</nav>
+
+<!-- 본문 -->
+<div class="board-wrap">
+  <div class="card shadow-sm border-0">
+
+    <!-- 카드 헤더 -->
+    <div class="card-header bg-white py-3">
+      <h5 id="pageTitle" class="mb-0 fw-bold">
+        <i class="bi bi-pencil-square me-2 text-primary"></i>글쓰기
+      </h5>
+    </div>
+
+    <!-- 로딩 (수정 모드에서 데이터 로드 시) -->
+    <div id="spinner" class="text-center py-4" style="display:none">
+      <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+      <span class="text-muted ms-2 small">게시글 정보를 불러오는 중...</span>
+    </div>
+
+    <!-- 폼 -->
+    <div class="card-body" id="formWrap">
+      <form id="postForm" novalidate>
+
+        <!-- 제목 -->
+        <div class="mb-3">
+          <label for="title" class="form-label fw-semibold">
+            제목 <span class="text-danger">*</span>
+          </label>
+          <input type="text" class="form-control" id="title"
+                 maxlength="200" placeholder="제목을 입력하세요">
+          <div class="d-flex justify-content-between mt-1">
+            <div class="invalid-feedback d-block" id="titleErr" style="display:none!important"></div>
+            <small class="text-muted char-count ms-auto">
+              <span id="titleLen">0</span>/200
+            </small>
+          </div>
+        </div>
+
+        <!-- 작성자 -->
+        <div class="mb-3">
+          <label for="author" class="form-label fw-semibold">
+            작성자 <span class="text-danger">*</span>
+          </label>
+          <input type="text" class="form-control" id="author"
+                 maxlength="50" placeholder="이름을 입력하세요" style="max-width:280px">
+          <div class="invalid-feedback" id="authorErr"></div>
+        </div>
+
+        <!-- 내용 -->
+        <div class="mb-1">
+          <label for="contentArea" class="form-label fw-semibold">
+            내용 <span class="text-danger">*</span>
+          </label>
+          <textarea class="form-control" id="contentArea"
+                    placeholder="내용을 입력하세요"></textarea>
+          <div class="invalid-feedback" id="contentErr"></div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- 카드 푸터: 버튼 -->
+    <div class="card-footer bg-white d-flex justify-content-between py-3">
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelBtn">
+        <i class="bi bi-x-circle me-1"></i>취소
+      </button>
+      <button type="button" class="btn btn-primary btn-sm px-4" id="submitBtn">
+        <i class="bi bi-check-circle me-1"></i>저장
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function qp(name) {
+    return new URLSearchParams(location.search).get(name);
+  }
+
+  const postId = qp('id');
+  const isEdit = !!postId;
+
+  /* ── 유효성 검사 헬퍼 ── */
+  function setInvalid($el, errId, msg) {
+    $el.addClass('is-invalid');
+    $('#' + errId).text(msg).show();
+  }
+  function setValid($el, errId) {
+    $el.removeClass('is-invalid').addClass('is-valid');
+    $('#' + errId).hide();
+  }
+
+  function validate() {
+    let ok = true;
+    const title   = $('#title').val().trim();
+    const author  = $('#author').val().trim();
+    const content = $('#contentArea').val().trim();
+
+    if (!title) {
+      setInvalid($('#title'), 'titleErr', '제목을 입력해주세요.'); ok = false;
+    } else { setValid($('#title'), 'titleErr'); }
+
+    if (!author) {
+      setInvalid($('#author'), 'authorErr', '작성자를 입력해주세요.'); ok = false;
+    } else { setValid($('#author'), 'authorErr'); }
+
+    if (!content) {
+      setInvalid($('#contentArea'), 'contentErr', '내용을 입력해주세요.'); ok = false;
+    } else { setValid($('#contentArea'), 'contentErr'); }
+
+    return ok;
+  }
+
+  $(function () {
+
+    // ── 수정 모드: 기존 데이터 로드 ──
+    if (isEdit) {
+      document.title = '글 수정 - 자유 게시판';
+      $('#pageTitle').html('<i class="bi bi-pencil me-2 text-primary"></i>글 수정');
+      $('#spinner').show();
+
+      $.ajax({
+        url: '/api/posts/' + postId + '/edit',  // 조회수 증가 없는 전용 엔드포인트
+        success(p) {
+          $('#title').val(p.title);
+          $('#titleLen').text(p.title.length);
+          $('#author').val(p.author);
+          $('#contentArea').val(p.content);
+          $('#spinner').hide();
+        },
+        error() {
+          alert('게시글을 불러오는 데 실패했습니다.');
+          location.href = '/index.html';
+        }
+      });
+    }
+
+    // ── 글자 수 카운터 ──
+    $('#title').on('input', function () {
+      $('#titleLen').text($(this).val().length);
+    });
+
+    // ── 취소 ──
+    $('#cancelBtn').on('click', function () {
+      if (isEdit) {
+        location.href = '/view.html?id=' + postId;
+      } else {
+        history.back();
+      }
+    });
+
+    // ── 저장 ──
+    $('#submitBtn').on('click', function () {
+      if (!validate()) return;
+
+      const payload = {
+        title:   $('#title').val().trim(),
+        author:  $('#author').val().trim(),
+        content: $('#contentArea').val().trim()
+      };
+
+      const url    = isEdit ? '/api/posts/' + postId : '/api/posts';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const $btn = $(this);
+      $btn.prop('disabled', true)
+          .html('<span class="spinner-border spinner-border-sm me-1"></span>저장 중...');
+
+      $.ajax({
+        url,
+        type: method,
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success(res) {
+          location.href = '/view.html?id=' + res.id;
+        },
+        error(xhr) {
+          const errData = xhr.responseJSON;
+          if (errData) {
+            // 서버 유효성 오류 표시
+            if (errData.title)   setInvalid($('#title'),       'titleErr',   errData.title);
+            if (errData.author)  setInvalid($('#author'),      'authorErr',  errData.author);
+            if (errData.content) setInvalid($('#contentArea'), 'contentErr', errData.content);
+            if (errData.error)   alert(errData.error);
+          } else {
+            alert('저장에 실패했습니다. 다시 시도해주세요.');
+          }
+          $btn.prop('disabled', false)
+              .html('<i class="bi bi-check-circle me-1"></i>저장');
+        }
+      });
+    });
+
+    // ── 실시간 유효성 해제 ──
+    $('#title, #author, #contentArea').on('input', function () {
+      $(this).removeClass('is-invalid is-valid');
+    });
+  });
+</script>
+</body>
+</html>

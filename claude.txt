@@ -1,0 +1,46 @@
+260520 --우선 claude로 수행해봄!
+
+[개발환경]
+- 백엔드 : Spring Boot 3.x (Java)
+- 프론트엔드 : HTML/Thymeleaf + jQuery
+- DB/인증 : Supabase (Postgres + Google OAuth) 
+- 배포 : Railway(Spring Boot 통합 배포)
+- AI 도구 : Claude Code CLI
+
+1. 베이스 만들기
+
+Spring Boot 3.x + jQuery로 게시판 앱 만들어 주십시오.
+- 로그인 없이 단순하게
+- src/main/java 구조, Java 17
+- 프론트엔드: HTML + jQuery + Bootstrap 5
+- DB: Supabase (PostgreSQL), Spring Data JPA
+- REST API 방식 (Controller → jQuery Ajax 호출)
+- 기능: 게시판 읽기/쓰기/수정/삭제
+
+2.GitHub 공개 저장소 생성 + origin 연결
+
+gh repo create project-claude --public --source=. --remote=origin
+
+3. git commit 및 push
+
+git add
+git commit -m "feat: vibe baseline (springboot3.x + jquery)"
+git push -u origin main
+
+4. 페르소나 도출
+
+게시판 앱(project-claude)의 페르소나 3개를 표로 만들어 주십시오.
+컬럼은 역할·기술 수준·주요 시나리오 3개. docs/personas.md로 저장.
+MVP 헌장 : 단일 테이블 기능 5개 이하 1일 안에 코드로 옮길 수 있는 분량.
+
+5. 사용자 시나리오·결정사항 
+
+페르소나 1번이 출근해서 퇴근까지 게시판 앱을
+어떻게 사용하는지 시간 순서로 시나리오를 적어 주십시오.
+결과를 docs/user-stories.md에 "## 1. 핵심 시나리오" 섹션으로 저장해 주십시오.
+위 시나리오에서 결정이 필요한 항목 5개만 질문 형식으로 적어 주십시오.
+(예: 게시글을 다른 사용자가 볼 수 있는가?)
+결과를 docs/user-stories.md에 "## 2. 결정 사항 섹션으로 추가해 주십시오
+
+
+

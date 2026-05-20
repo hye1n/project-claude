@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>자유 게시판</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f2f5; }
+    .board-wrap { max-width: 980px; margin: 40px auto; padding: 0 16px; }
+    .table thead th { background-color: #343a40; color: #fff; border: none; }
+    .table tbody tr { cursor: pointer; transition: background .15s; }
+    .table tbody tr:hover { background-color: #eef2ff; }
+    .title-link { text-decoration: none; color: #212529; font-weight: 500; }
+    .title-link:hover { color: #0d6efd; text-decoration: underline; }
+    .badge-new { font-size: 0.6rem; vertical-align: middle; margin-left: 4px; }
+    .page-link { color: #0d6efd; }
+    .page-item.active .page-link { background-color: #0d6efd; border-color: #0d6efd; }
+  </style>
+</head>
+<body>
+
+<!-- 네비게이션 -->
+<nav class="navbar navbar-dark bg-dark shadow-sm">
+  <div class="container" style="max-width:980px">
+    <a class="navbar-brand fw-bold fs-5" href="/index.html">
+      <i class="bi bi-journal-text me-2"></i>자유 게시판
+    </a>
+  </div>
+</nav>
+
+<!-- 본문 -->
+<div class="board-wrap">
+  <div class="card shadow-sm border-0">
+
+    <!-- 카드 헤더: 제목 + 검색 + 글쓰기 -->
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-bold text-secondary">
+        <i class="bi bi-list-ul me-1"></i>게시글 목록
+        <span class="text-muted fw-normal fs-6 ms-1" id="totalCount"></span>
+      </h6>
+      <div class="d-flex gap-2">
+        <div class="input-group input-group-sm" style="width:220px">
+          <input type="text" id="searchInput" class="form-control" placeholder="제목/내용 검색...">
+          <button class="btn btn-outline-secondary" id="searchBtn" title="검색">
+            <i class="bi bi-search"></i>
+          </button>
+          <button class="btn btn-outline-secondary" id="resetBtn" title="초기화" style="display:none">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <a href="/write.html" class="btn btn-primary btn-sm">
+          <i class="bi bi-pencil-square me-1"></i>글쓰기
+        </a>
+      </div>
+    </div>
+
+    <!-- 로딩 -->
+    <div id="spinner" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">불러오는 중...</span>
+      </div>
+      <p class="text-muted mt-2 small">게시글을 불러오는 중입니다...</p>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="table-responsive" id="tableWrap" style="display:none">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="text-center" style="width:70px">번호</th>
+            <th>제목</th>
+            <th class="text-center" style="width:100px">작성자</th>
+            <th class="text-center" style="width:80px">조회</th>
+            <th class="text-center" style="width:140px">작성일</th>
+          </tr>
+        </thead>
+        <tbody id="postList"></tbody>
+      </table>
+    </div>
+
+    <!-- 빈 상태 -->
+    <div id="emptyMsg" class="text-center py-5 text-muted" style="display:none">
+      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+      등록된 게시글이 없습니다.
+    </div>
+
+    <!-- 카드 푸터: 페이지네이션 -->
+    <div class="card-footer bg-white py-2" id="paginationWrap" style="display:none">
+      <nav>
+        <ul class="pagination pagination-sm justify-content-center mb-0" id="pagination"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const PAGE_SIZE = 10;
+  let allPosts = [];
+  let displayPosts = [];
+  let currentPage = 1;
+
+  /* ── 날짜 포맷 ── */
+  function fmtDate(str) {
+    if (!str) return '-';
+    const d = new Date(str);
+    const now = new Date();
+    // 오늘이면 시:분 표시
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+
+  function isNew(str) {
+    return str && (new Date() - new Date(str)) < 86400000; // 24시간 이내
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── 렌더링 ── */
+  function render() {
+    const total = displayPosts.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    $('#totalCount').text('(' + total + '건)');
+
+    if (total === 0) {
+      $('#tableWrap, #paginationWrap').hide();
+      $('#emptyMsg').show();
+      return;
+    }
+
+    $('#emptyMsg').hide();
+    $('#tableWrap').show();
+
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const rows = displayPosts.slice(start, start + PAGE_SIZE);
+    let html = '';
+    rows.forEach((p, i) => {
+      const num = total - start - i;
+      const newBadge = isNew(p.createdAt)
+        ? '<span class="badge bg-danger badge-new">N</span>' : '';
+      html += `
+        <tr onclick="location.href='/view.html?id=${p.id}'">
+          <td class="text-center text-muted small">${num}</td>
+          <td>
+            <a href="/view.html?id=${p.id}" class="title-link"
+               onclick="event.stopPropagation()">${esc(p.title)}</a>${newBadge}
+          </td>
+          <td class="text-center small">${esc(p.author)}</td>
+          <td class="text-center text-muted small">${p.viewCount}</td>
+          <td class="text-center text-muted small">${fmtDate(p.createdAt)}</td>
+        </tr>`;
+    });
+    $('#postList').html(html);
+    renderPaging(totalPages);
+    $('#paginationWrap').toggle(totalPages > 1);
+  }
+
+  function renderPaging(totalPages) {
+    if (totalPages <= 1) { $('#pagination').empty(); return; }
+    let h = '';
+    h += `<li class="page-item ${currentPage===1?'disabled':''}">
+            <a class="page-link" href="#" data-p="${currentPage-1}">‹</a></li>`;
+    for (let i = 1; i <= totalPages; i++) {
+      h += `<li class="page-item ${i===currentPage?'active':''}">
+              <a class="page-link" href="#" data-p="${i}">${i}</a></li>`;
+    }
+    h += `<li class="page-item ${currentPage===totalPages?'disabled':''}">
+            <a class="page-link" href="#" data-p="${currentPage+1}">›</a></li>`;
+    $('#pagination').html(h);
+  }
+
+  /* ── API 호출 ── */
+  function loadPosts(keyword) {
+    $('#spinner').show();
+    $('#tableWrap, #emptyMsg, #paginationWrap').hide();
+    let url = '/api/posts';
+    if (keyword) url += '?keyword=' + encodeURIComponent(keyword);
+
+    $.ajax({
+      url,
+      success(data) {
+        allPosts = data;
+        displayPosts = data;
+        currentPage = 1;
+        render();
+      },
+      error() { alert('게시글을 불러오는 데 실패했습니다.'); },
+      complete() { $('#spinner').hide(); }
+    });
+  }
+
+  /* ── 이벤트 ── */
+  $(function () {
+    loadPosts();
+
+    $('#searchBtn').on('click', function () {
+      const kw = $('#searchInput').val().trim();
+      if (!kw) return;
+      loadPosts(kw);
+      $('#resetBtn').show();
+    });
+
+    $('#resetBtn').on('click', function () {
+      $('#searchInput').val('');
+      $(this).hide();
+      loadPosts();
+    });
+
+    $('#searchInput').on('keypress', function (e) {
+      if (e.which === 13) $('#searchBtn').click();
+    });
+
+    $(document).on('click', '#pagination .page-link', function (e) {
+      e.preventDefault();
+      const p = parseInt($(this).data('p'));
+      const max = Math.ceil(displayPosts.length / PAGE_SIZE);
+      if (p >= 1 && p <= max) {
+        currentPage = p;
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  });
+</script>
+</body>
+</html>

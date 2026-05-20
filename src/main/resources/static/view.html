@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>게시글 보기 - 자유 게시판</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background-color: #f0f2f5; }
+    .board-wrap { max-width: 980px; margin: 40px auto; padding: 0 16px; }
+    .post-content {
+      min-height: 220px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.9;
+      font-size: 1rem;
+      color: #333;
+    }
+    .meta-item { font-size: 0.85rem; color: #6c757d; }
+  </style>
+</head>
+<body>
+
+<!-- 네비게이션 -->
+<nav class="navbar navbar-dark bg-dark shadow-sm">
+  <div class="container" style="max-width:980px">
+    <a class="navbar-brand fw-bold fs-5" href="/index.html">
+      <i class="bi bi-journal-text me-2"></i>자유 게시판
+    </a>
+  </div>
+</nav>
+
+<!-- 본문 -->
+<div class="board-wrap">
+
+  <!-- 로딩 -->
+  <div id="spinner" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="text-muted mt-2 small">불러오는 중...</p>
+  </div>
+
+  <!-- 게시글 카드 -->
+  <div class="card shadow-sm border-0" id="postCard" style="display:none">
+    <div class="card-header bg-white py-3">
+      <h5 id="postTitle" class="mb-0 fw-bold lh-base"></h5>
+      <div class="d-flex flex-wrap gap-3 mt-2">
+        <span class="meta-item"><i class="bi bi-person-fill me-1"></i><span id="postAuthor"></span></span>
+        <span class="meta-item"><i class="bi bi-clock me-1"></i><span id="postDate"></span></span>
+        <span class="meta-item"><i class="bi bi-eye me-1"></i>조회 <span id="postViews"></span></span>
+      </div>
+    </div>
+
+    <div class="card-body py-4">
+      <div id="postContent" class="post-content"></div>
+    </div>
+
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+      <a href="/index.html" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-list me-1"></i>목록
+      </a>
+      <div class="d-flex gap-2">
+        <button id="editBtn" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-pencil me-1"></i>수정
+        </button>
+        <button id="deleteBtn" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-trash me-1"></i>삭제
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오류 -->
+  <div id="errMsg" class="alert alert-danger d-none">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    게시글을 찾을 수 없거나 오류가 발생했습니다.
+    <a href="/index.html" class="alert-link ms-2">목록으로 돌아가기</a>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">
+          <i class="bi bi-exclamation-triangle text-danger me-2"></i>삭제 확인
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-muted">
+        이 게시글을 삭제하면 복구할 수 없습니다.<br>
+        정말 삭제하시겠습니까?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">
+          <i class="bi bi-trash me-1"></i>삭제
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function qp(name) {
+    return new URLSearchParams(location.search).get(name);
+  }
+
+  function fmtDate(str) {
+    if (!str) return '-';
+    return new Date(str).toLocaleString('ko-KR', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  const postId = qp('id');
+  let modal;
+
+  $(function () {
+    if (!postId) { location.href = '/index.html'; return; }
+
+    modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    // ── 게시글 로드 ──
+    $.ajax({
+      url: '/api/posts/' + postId,
+      success(p) {
+        document.title = p.title + ' - 자유 게시판';
+        $('#postTitle').text(p.title);
+        $('#postAuthor').text(p.author);
+        $('#postDate').text(fmtDate(p.createdAt));
+        $('#postViews').text(p.viewCount);
+        $('#postContent').text(p.content); // XSS 방지: text() 사용
+        $('#spinner').hide();
+        $('#postCard').show();
+      },
+      error() {
+        $('#spinner').hide();
+        $('#errMsg').removeClass('d-none');
+      }
+    });
+
+    // ── 수정 ──
+    $('#editBtn').on('click', function () {
+      location.href = '/write.html?id=' + postId;
+    });
+
+    // ── 삭제 버튼 → 모달 열기 ──
+    $('#deleteBtn').on('click', function () {
+      modal.show();
+    });
+
+    // ── 삭제 확인 ──
+    $('#confirmDeleteBtn').on('click', function () {
+      const $btn = $(this);
+      $btn.prop('disabled', true)
+          .html('<span class="spinner-border spinner-border-sm me-1"></span>삭제 중...');
+
+      $.ajax({
+        url: '/api/posts/' + postId,
+        type: 'DELETE',
+        success() {
+          modal.hide();
+          // 목록으로 이동 (토스트 대신 간단 alert)
+          alert('게시글이 삭제되었습니다.');
+          location.href = '/index.html';
+        },
+        error() {
+          alert('삭제에 실패했습니다. 다시 시도해주세요.');
+          $btn.prop('disabled', false)
+              .html('<i class="bi bi-trash me-1"></i>삭제');
+        }
+      });
+    });
+  });
+</script>
+</body>
+</html>

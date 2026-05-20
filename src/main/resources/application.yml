@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    # ⚠️ Supabase > Settings > Database > Connection string (JDBC) 값으로 교체하세요
+    url: jdbc:postgresql://db.YOUR_PROJECT_REF.supabase.co:5432/postgres?sslmode=require
+    username: postgres
+    password: YOUR_SUPABASE_PASSWORD
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: update        # 첫 실행 시 테이블 자동 생성
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+    open-in-view: false
+
+  jackson:
+    time-zone: Asia/Seoul
+
+server:
+  port: 8080
